@@ -82,7 +82,11 @@ You can help support development by reporting [issues](https://github.com/TecnaG
   and towns are written in the local language with their English name under it, villages in the local language
   only. The boards are drawn from the road network and Overture's places and route numbers, so they are a good
   guess of a real board, not a copy: the distances are the straight ones scaled to a road's, and the colours and
-  plates follow each country's practice as best known.
+  plates follow each country's practice as best known. The same switch adds town entry and exit signs: a white
+  (German: yellow) board with the settlement's name where a road enters built-up land, and the same name crossed out
+  on a board of its own for the other way; the name is the nearest settlement of Overture's (cities and towns with
+  their English name under it), the limit where the land cover turns built-up, so it is a good guess of where the
+  real sign stands. Roads from tertiary down to unclassified (not motorways, ramps or minor streets) take them.
 - Bridges drawn as their real type (beam, truss, arch, cable-stayed, suspension) with real heights and spans, piers
   that keep clear of the roads under them and 6 m (20 ft) of headroom over roads where the ground allows; a divided
   road's two decks joined across a narrow median; tunnels through hills, with portals, lights and low arches where
@@ -445,8 +449,8 @@ The repository contains only code; all map data is downloaded at runtime and cac
 - Highway signs: OpenStreetMap contributors (ODbL; exit and overhead destinations and mile references, rebuilt
   weekly from the planet by the BeamNG.Earth-data repo); lettering: the Roadgeek 2014 font (MIT, Sammi De Guzman);
   US state outlines: U.S. Census Bureau TIGERweb (public domain).
-- Direction signs: place names, populations and road route numbers from Overture Maps / OpenStreetMap contributors
-  (ODbL); lettering: Overpass (SIL OFL 1.1) and Fira Sans Condensed (SIL OFL 1.1).
+- Direction signs and town entry / exit signs: place and settlement names, populations and road route numbers from
+  Overture Maps / OpenStreetMap contributors (ODbL); lettering: Overpass (SIL OFL 1.1) and Fira Sans Condensed (SIL OFL 1.1).
 - Railways: OpenStreetMap contributors (ODbL; railway tags, rebuilt weekly from the planet by the [BeamNG.Earth-data](https://github.com/TecnaGamer/BeamNG.Earth-data) repo's GitHub Action); US level crossings: the Federal Railroad Administration's Highway-Rail Crossing Inventory (public domain).
 - Climate zones (the forest sounds' set): Beck et al. (2023), High-resolution (1 km) Köppen-Geiger maps for
   1901–2099, Scientific Data 10, 724 (CC BY 4.0).

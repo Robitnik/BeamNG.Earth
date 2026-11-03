@@ -30,6 +30,7 @@ mod medians;
 mod speedsigns;
 mod dirsigns;
 mod dirsigns_face;
+mod entrysigns;
 mod cachemap;
 mod areacover;
 mod geotiles;
@@ -5305,6 +5306,8 @@ fn earthfast(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(dirsigns::dirsign_mesh, m)?)?;
     m.add_function(wrap_pyfunction!(dirsigns_face::dirsign_set_fonts, m)?)?;
     m.add_function(wrap_pyfunction!(dirsigns_face::dirsign_face, m)?)?;
+    m.add_function(wrap_pyfunction!(dirsigns_face::dirsign_town_face, m)?)?;
+    m.add_function(wrap_pyfunction!(entrysigns::town_sign_place, m)?)?;
     m.add_function(wrap_pyfunction!(island_ring_rays, m)?)?;
     m.add_function(wrap_pyfunction!(dsm::dsm_ground, m)?)?;
     m.add_function(wrap_pyfunction!(dsm::fill_holes, m)?)?;
@@ -5488,6 +5491,6 @@ fn earthfast(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<traffic::Routes>()?;
     m.add_class::<clearance::Clearance>()?;
     m.add_class::<clearance::DeckLevels>()?;
-    m.add("VERSION", 151)?;
+    m.add("VERSION", 152)?;
     Ok(())
 }

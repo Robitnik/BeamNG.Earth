@@ -7,7 +7,8 @@ same bytes every run. Players never run this tool: they use the bundled snapshot
 
     python tools/build_places.py --output server/data/places_<release>.json.gz [--countries UA,CZ,PL,DE]
 
-A place is kept when it is a city or a town, or a village of at least MIN_VILLAGE_POPULATION people. The English name
+A place is kept when it is a city or a town, or a village of at least MIN_VILLAGE_POPULATION people (--all: every city,
+town and village, the settlements the entry and exit signs name: server/entrysigns.py). The English name
 is kept only where it differs from the local one (Overture has `names.common.en` where an exonym or a transliteration
 exists), so a sign writes its second line only when there is something to say.
 """
@@ -33,7 +34,7 @@ def parquet_url():
     return item["assets"]["aws"]["href"]
 
 
-def fetch(countries, parquet=None):
+def fetch(countries, parquet=None, every=False):
     import duckdb
     con = duckdb.connect()
     if parquet:
@@ -42,12 +43,14 @@ def fetch(countries, parquet=None):
         con.execute("INSTALL httpfs; LOAD httpfs;")
         src = f"read_parquet('{parquet_url()}')"
     marks = ",".join("?" * len(countries))
+    kept = ("class IN ('city', 'town', 'village')" if every else
+            f"(class IN ('city', 'town') OR (class = 'village' AND population >= {MIN_VILLAGE_POPULATION}))")
     rows = con.execute(f"""
         SELECT id, country, class, names."primary", names.common['en'], population,
                (bbox.xmin + bbox.xmax) / 2, (bbox.ymin + bbox.ymax) / 2
         FROM {src}
         WHERE country IN ({marks}) AND subtype = 'locality' AND names."primary" IS NOT NULL
-          AND (class IN ('city', 'town') OR (class = 'village' AND population >= {MIN_VILLAGE_POPULATION}))
+          AND {kept}
         """, list(countries)).fetchall()
     places = []
     for pid, cc, cls, name, en, pop, lon, lat in rows:
@@ -61,14 +64,15 @@ def fetch(countries, parquet=None):
     return places
 
 
-def build(output, countries, parquet=None):
-    places = fetch(countries, parquet)
+def build(output, countries, parquet=None, every=False):
+    places = fetch(countries, parquet, every)
     counts = {}
     for p in places:
         counts[p["cc"]] = counts.get(p["cc"], 0) + 1
     doc = {"format": 1, "source": "Overture Maps divisions/division", "release": RELEASE,
            "license": "ODbL-1.0 (OpenStreetMap contributors), see places.NOTICE.md",
-           "selection": f"locality city/town, village with population >= {MIN_VILLAGE_POPULATION}",
+           "selection": ("locality city/town/village" if every else
+                         f"locality city/town, village with population >= {MIN_VILLAGE_POPULATION}"),
            "counts": dict(sorted(counts.items())), "places": places}
     raw = gzip.compress(json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode("utf-8"), mtime=0)
     output = Path(output)
@@ -82,6 +86,8 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--output", type=Path, required=True)
     ap.add_argument("--countries", default=",".join(COUNTRIES))
+    ap.add_argument("--all", action="store_true", dest="every",
+                    help="every city, town and village (the settlements the entry and exit signs name)")
     ap.add_argument("--parquet", type=Path, help="a downloaded copy of the divisions file (skips the range reads)")
     a = ap.parse_args()
-    build(a.output, tuple(c.strip().upper() for c in a.countries.split(",") if c.strip()), a.parquet)
+    build(a.output, tuple(c.strip().upper() for c in a.countries.split(",") if c.strip()), a.parquet, a.every)

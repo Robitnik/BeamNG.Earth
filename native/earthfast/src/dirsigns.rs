@@ -130,7 +130,7 @@ fn unit(v: [f64; 2]) -> [f64; 2] {
 fn dot(a: [f64; 2], b: [f64; 2]) -> f64 { a[0] * b[0] + a[1] * b[1] }
 
 /// Whether a disc (c, r) is clear of every polygon (outside it and r from its edges).
-fn clear(c: [f64; 2], r: f64, poly: &numpy::ndarray::ArrayView2<f64>, off: &numpy::ndarray::ArrayView1<i64>,
+pub(crate) fn clear(c: [f64; 2], r: f64, poly: &numpy::ndarray::ArrayView2<f64>, off: &numpy::ndarray::ArrayView1<i64>,
          boxes: &[[f64; 4]]) -> bool {
     for (q, bx) in boxes.iter().enumerate() {
         if c[0] + r < bx[0] || c[0] - r > bx[2] || c[1] + r < bx[1] || c[1] - r > bx[3] { continue; }

@@ -20,6 +20,7 @@ import roadmesh
 import roads
 import signstates
 import dirsigns
+import entrysigns
 import speedsigns
 import staging
 
@@ -75,7 +76,10 @@ def build_tile(md, frame, aid, tx, ty, elev, out_dir, vfs_dir, urban=None, width
                 pts = np.column_stack(frame.geodetic_to_enu(ring[:, 1], ring[:, 0], 0.))
                 decks.append({'deck': True, 'n': pts, 'w': spec.width})
     speeds = _speeds(frame, tx, ty, elev, context, decks, left_hand, mph, speedsigns.style(country, us))
-    dir_mesh, dir_faces = _dirs(md, frame, tx, ty, elev, context, decks, left_hand, mph, out_dir, vfs_dir)         if dirs else (None, {})
+    try:
+        dir_mesh, dir_faces = _dirs(md, frame, tx, ty, elev, context, decks, left_hand, mph, out_dir, vfs_dir) if dirs else (None, {})
+    except entrysigns.Incomplete:       # (the land cover is still loading: the tile is built again in a moment)
+        return None
     if not (WORLD or us):
         # (not the US: no guide signs)
         return write_tile(out_dir, vfs_dir, aid, tx, ty, (None, None, None, speeds, dir_mesh), dir_faces)
@@ -101,16 +105,26 @@ def _speeds(frame, tx, ty, elev, context, decks, left_hand, mph, face):
 
 
 def _dirs(md, frame, tx, ty, elev, context, decks, left_hand, mph, out_dir, vfs_dir):
-    """dirsigns.build_tile: (mesh, faces) or (None, {}): optional scenery never stops the other signs."""
+    """The direction boards and the town entry / exit signs, one mesh and one set of pictures: (mesh, faces) or
+    (None, {}). Optional scenery never stops the other signs, nor one of these the other."""
+    mesh, faces = _optional('Direction signs', dirsigns.build_tile, md, frame, tx, ty, elev, context, decks, left_hand,
+                            mph, out_dir, vfs_dir)
+    tmesh, tfaces = _optional('Town signs', entrysigns.build_tile, md, frame, tx, ty, elev, context, decks, left_hand,
+                              mph, out_dir, vfs_dir)
+    return entrysigns.merge(mesh, tmesh), {**faces, **tfaces}
+
+
+def _optional(what, build, *args):
     global _warned_dirs
     try:
-        return dirsigns.build_tile(md, frame, tx, ty, elev, context, decks, left_hand, mph, out_dir, vfs_dir)
+        return build(*args)
+    except entrysigns.Incomplete:
+        raise
     except Exception as error:
         now = time.monotonic()
         if now - _warned_dirs >= 60.:
             _warned_dirs = now
-            log.warning('Direction signs unavailable; roads continue: %s: %s', type(error).__name__, error,
-                        exc_info=True)
+            log.warning('%s unavailable; roads continue: %s: %s', what, type(error).__name__, error, exc_info=True)
         return None, {}
 
 

@@ -15,6 +15,25 @@
     "px_per_m": 256.0, "cap_m": 0.20, "en_share": 0.72, "min_w_m": 2.0, "max_w_m": 6.0,
     "inset_m": 0.015, "trim_w_m": 0.022
   },
+  "town": {
+    "_comment": "Town entry and exit signs (server/entrysigns.py, the user, 2026-11-03: white boards with the settlement's name, crossed out where the road leaves it). placement: step_m = the built-up land cover is sampled this often along a road; run_in_m / run_out_m = built-up / open land that must follow / precede a settlement's limit (a park or a field is not one); inward_m = the name is the settlement nearest (by size) to a point this far inside the limit; name_slack / name_extra_m = a settlement counts up to slack * its radius + extra m away; dup_m = one sign a way and settlement within this; core_share / core_pop = inside this share of a settlement's radius (from its centre) of a settlement of this many people no sign stands (a park or a river in a city is no limit); min_rank = the lowest road class (tertiary 3, unclassified 2, residential 1) that takes a sign. face: sizes in m. countries: bg / ink / edge line / bar (the diagonal of an exit) colours; 'verified': false = from memory, not the legal text or a photo (docs/research/direction_signs.md).",
+    "placement": {
+      "step_m": 20.0, "run_in_m": 120.0, "run_out_m": 250.0, "inward_m": 250.0,
+      "lateral_urban_m": 0.6, "lateral_rural_m": 1.5, "panel_w_m": 2.0, "mount_m": 1.5,
+      "dup_m": 120.0, "name_slack": 1.2, "name_extra_m": 300.0, "core_share": 0.5, "core_pop": 10000, "min_rank": 2,
+      "verified": false
+    },
+    "face": {
+      "px_per_m": 256.0, "cap_m": 0.16, "en_share": 0.62, "min_w_m": 1.2, "max_w_m": 2.6,
+      "inset_m": 0.01, "line_w_m": 0.016, "bar_w_m": 0.07
+    },
+    "countries": {
+      "UA": {"verified": false, "bg": [255, 255, 255], "ink": [0, 0, 0], "edge": [0, 0, 0], "bar": [196, 30, 36]},
+      "CZ": {"verified": false, "bg": [255, 255, 255], "ink": [0, 0, 0], "edge": [0, 0, 0], "bar": [196, 30, 36]},
+      "PL": {"verified": false, "bg": [255, 255, 255], "ink": [0, 0, 0], "edge": [0, 0, 0], "bar": [196, 30, 36]},
+      "DE": {"verified": false, "bg": [255, 205, 0], "ink": [0, 0, 0], "edge": [0, 0, 0], "bar": [196, 30, 36]}
+    }
+  },
   "distance_round": [[20, 1], [100000, 5]],
   "countries": {
     "UA": {
