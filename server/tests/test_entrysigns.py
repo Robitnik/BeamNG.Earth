@@ -135,6 +135,44 @@ class PlaceTest(unittest.TestCase):
         self.assertEqual(len(signs({}, settlements([VILLAGE]))), 0)
 
 
+class BuiltUpTest(unittest.TestCase):
+    """Riv, Vinnytsia Oblast (docs/done/016): the land cover read the trunk road's asphalt as built-up for 700 m of fields."""
+
+    def built(self, xy):
+        xy = np.asarray(xy, np.float64).reshape(-1, 2)
+        centres = np.column_stack([xy[:, 0] / M_LON + LON0, xy[:, 1] / M_LAT + LAT0])
+        return entrysigns.built_by_buildings(centres, 100.0, 3)
+
+    def at(self, built, *x):
+        x = np.asarray(x, np.float64)
+        return built(np.full(len(x), LAT0), x / M_LON + LON0).tolist()
+
+    def test_a_filling_station_is_not_a_settlement(self):
+        self.assertEqual(self.at(self.built([(0, 20), (15, 30)]), 0.0), [False])
+
+    def test_houses_are_and_the_field_beyond_them_is_not(self):
+        built = self.built([(0, 30), (40, -30), (-40, 30), (80, 30)])
+        self.assertEqual(self.at(built, 0.0, 40.0, 500.0), [True, True, False])
+
+    def test_a_house_past_the_radius_does_not_count(self):
+        self.assertEqual(self.at(self.built([(0, 30), (40, -30), (0, 400)]), 0.0), [False])
+
+    def test_no_buildings(self):
+        self.assertEqual(self.at(self.built([]), 0.0), [False])
+
+    @staticmethod
+    def sign(exit_):
+        return [0.0, 0.0, 0.0, 1.0, 0, 0, float(exit_)]         # at the origin, going north
+
+    def test_an_entry_leads_to_its_settlement_and_an_exit_from_it(self):
+        self.assertTrue(entrysigns.goes_the_right_way(self.sign(False), (0.0, 440.0), 250.0))
+        self.assertTrue(entrysigns.goes_the_right_way(self.sign(True), (0.0, -440.0), 250.0))
+
+    def test_the_signs_of_riv_are_dropped(self):
+        self.assertFalse(entrysigns.goes_the_right_way(self.sign(True), (0.0, 440.0), 250.0), "crossed out on the way in")
+        self.assertFalse(entrysigns.goes_the_right_way(self.sign(False), (0.0, -440.0), 250.0), "an entry on the way out")
+
+
 class StyleTest(unittest.TestCase):
     def test_every_country_has_a_complete_style_and_a_known_board_style(self):
         town = dirsigns.styles()["town"]
@@ -145,7 +183,7 @@ class StyleTest(unittest.TestCase):
         for k in ("px_per_m", "cap_m", "en_share", "min_w_m", "max_w_m", "inset_m", "line_w_m", "bar_w_m"):
             self.assertIn(k, town["face"])
         for k in ("core_share", "core_pop", "step_m", "run_in_m", "run_out_m", "inward_m", "lateral_urban_m", "lateral_rural_m", "panel_w_m",
-                  "mount_m", "dup_m", "name_slack", "name_extra_m", "min_rank"):
+                  "mount_m", "dup_m", "name_slack", "name_extra_m", "min_rank", "built_radius_m", "built_min"):
             self.assertIn(k, town["placement"])
 
     def test_the_settlement_snapshot_is_the_one_that_was_checked(self):

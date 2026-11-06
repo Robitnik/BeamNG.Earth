@@ -5,8 +5,8 @@ settings page's Direction signs).
 The glue of the native kernels earthfast.town_sign_place (where the limit of a settlement is on a road, which side the
 sign stands, which settlement it names), dirsign_town_face (the picture: PNG) and dirsign_mesh (panel and posts, shared
 with the direction boards). The rules are in native/earthfast/src/entrysigns.rs; here the data they need: the roads'
-built-up land cover (sampled every town.placement.step_m along each road worth a sign: the land cover the road
-widths use), every settlement (server/data/settlements_<release>.json.gz, tools/build_places.py --all) and the
+built-up land cover (sampled every town.placement.step_m along each road worth a sign: the buildings near each
+sample, the land cover only where no building is known), every settlement (server/data/settlements_<release>.json.gz, tools/build_places.py --all) and the
 styles by country (server/data/dirsigns_styles.json, section "town").
 
 Built in the sign tiles beside the direction boards (signstream.py: one mesh, one set of faces). Render-only.
@@ -37,12 +37,72 @@ SETTLEMENTS_SHA256 = "8a1dde823acb6969ff243df7d9829b953481981a763b2adc9fcc516b53
 FACE_VERSION = 1
 MAX_FACES = 24                  # distinct pictures a tile makes at most
 MARGIN_M = 800.0                # m round the tile the roads are read (the chain beyond a road's end, the pavements)
+M_PER_DEG = 111320.0
 MAX_RANK = 6                    # no town signs on motorways (rank 7)
 
 
 class Incomplete(Exception):
     """The land cover a tile's settlements limits are found by was not all there yet: the tile is built again later (a
     tile built on it would show a cached cell's edge as a settlement's limit)."""
+
+
+def _centres(feats):
+    """(n, 2) [lon, lat] of a cell's buildings (the mean of each outer ring), kept on the decoded cell."""
+    got = feats.__dict__.get("_town_centres")
+    if got is None:
+        rows = []
+        for i in range(len(feats)):
+            ring = feats.ring_off[feats.part_off[i]]
+            rows.append(feats.lonlat[feats.coord_off[ring]:feats.coord_off[ring + 1]].mean(0))
+        got = np.array(rows, np.float64).reshape(-1, 2)
+        feats.__dict__["_town_centres"] = got
+    return got
+
+
+def buildings_near(md, la, lo):
+    """(n, 2) [lon, lat] of the buildings in the map cells over the (lat, lon) box, each once (a building is in every
+    cell it crosses). A cell's buildings not there: Incomplete."""
+    got = []
+    for key in mapcells.cells_for_bbox(float(la.min()), float(lo.min()), float(la.max()), float(lo.max())):
+        feats = md.cell(key, layers=("buildings",), kind="demand").layers.get("buildings")
+        if feats is None:
+            raise Incomplete("buildings not there yet")
+        if len(feats):
+            got.append(_centres(feats))
+    if not got:
+        return np.zeros((0, 2))
+    return np.unique(np.round(np.vstack(got), 6), axis=0)
+
+
+def built_by_buildings(centres, radius, least):
+    """built(lat, lon): are at least `least` buildings within radius m of each point? The land cover cannot say this: it
+    reads a road's own asphalt as built-up, so an empty trunk road in the fields was a settlement (Riv, Vinnytsia
+    Oblast, 700 m of it: a crossed-out sign on the way in, docs/done/016)."""
+    centres = centres[np.argsort(centres[:, 0])]
+
+    def built(lat, lon):
+        lat, lon = np.asarray(lat, np.float64), np.asarray(lon, np.float64)
+        out = np.zeros(len(lat), bool)
+        if not len(lat) or len(centres) < least:
+            return out
+        c = float(np.cos(np.radians(lat.mean())))
+        dx = radius / (M_PER_DEG * c)
+        lows = np.searchsorted(centres[:, 0], lon - dx)
+        highs = np.searchsorted(centres[:, 0], lon + dx)
+        for i in np.flatnonzero(highs - lows >= least):
+            near = centres[lows[i]:highs[i]]
+            d2 = ((near[:, 0] - lon[i]) * M_PER_DEG * c) ** 2 + ((near[:, 1] - lat[i]) * M_PER_DEG) ** 2
+            out[i] = np.count_nonzero(d2 <= radius * radius) >= least
+        return out
+    return built
+
+
+def goes_the_right_way(sign, centre, reach):
+    """Does an entry lead towards the settlement it names, an exit away from it? sign: a town_sign_place row; centre: the
+    settlement in the same metres; reach: m either side of the limit."""
+    ahead = np.hypot(sign[0] + sign[2] * reach - centre[0], sign[1] + sign[3] * reach - centre[1])
+    behind = np.hypot(sign[0] - sign[2] * reach - centre[0], sign[1] - sign[3] * reach - centre[1])
+    return ahead > behind if sign[6] else ahead < behind
 
 
 @lru_cache(maxsize=1)
@@ -155,7 +215,13 @@ def build_tile(md, frame, tx, ty, elev, context, decks, left_hand, mph, out_dir,
             if fid not in seen:
                 seen.add(fid)
                 rows[fid] = row
-    arrays = _arrays(rows, box, MARGIN_M, cfg["placement"], context.urban)
+    place = cfg["placement"]
+    pad = MARGIN_M + place["built_radius_m"]
+    bla, blo, _ = frame.enu_to_geodetic(np.array([x0 - pad, x1 + pad]), np.array([y0 - pad, y1 + pad]), 0.0)
+    centres = buildings_near(md, bla, blo)
+    # (no building for kilometres: no data here, the land cover is all there is)
+    built = built_by_buildings(centres, place["built_radius_m"], place["built_min"]) if len(centres) else context.urban
+    arrays = _arrays(rows, box, MARGIN_M, place, built)
     if arrays is None:
         return None, {}
     cla, clo, _ = frame.enu_to_geodetic(np.array([x0, x1, x0, x1]), np.array([y0, y0, y1, y1]), 0.0)
@@ -169,6 +235,9 @@ def build_tile(md, frame, tx, ty, elev, context, decks, left_hand, mph, out_dir,
         if exitsigns._on_deck(b[0:2], decks, 1.5):
             continue
         i = int(b[7])
+        ce, cn, _ = frame.geodetic_to_enu(pl.array[i, 1], pl.array[i, 0], 0.0)
+        if not goes_the_right_way(b, (float(ce), float(cn)), place["inward_m"]):
+            continue
         country = cfg["countries"].get(pl.cc[i])
         if country is None:
             continue
